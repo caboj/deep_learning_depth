@@ -24,8 +24,10 @@ def main():
                         help='number of training samples to use')
     parser.add_argument('-d', metavar='depth', dest="depth",type=int,
                         help='number of reblocks to use')
+    parser.add_argument('-p', metavar="survival_p", dest="survival_p", type=float, 
+                        help='set this to use stochastic resnet')
 
-    parser.set_defaults(epochs=100,samples=0,batch_size=1,depth=10)
+    parser.set_defaults(epochs=100,samples=0,batch_size=1,depth=10,survival_p=0)
     args = parser.parse_args()
     
     epochs=args.epochs
@@ -33,14 +35,14 @@ def main():
     batch_size=args.batch_size
     depth=args.depth
     samples_test = len(test_data[1]) if args.samples == 0 else args.samples
-    
+    pl=args.survival_p
+   
     X_train = np.array(train_data[0][:samples])
     y_train = np.array(train_data[1][:samples])
     X_test = np.array(test_data[0][:samples_test])
     y_test = np.array(test_data[1][:samples_test])
 
-
-    net = ResNet((1,28,28),depth)
+    net = ResNet((1,28,28),depth,pl)
     resnet = net.get_net()
     sgd =SGD(lr=0.1, decay=1e-6,momentum=0.9)
     resnet.compile(optimizer=sgd,
@@ -48,11 +50,15 @@ def main():
               metrics=['accuracy'])
 
     labels = to_categorical(y_train, 10)
-
-    resnet.fit(X_train,labels,nb_epoch=epochs,batch_size=batch_size)
+    sample_z = SurvivalProb(depth,pl)
+            
+    
+    resnet.fit(X_train,labels,nb_epoch=epochs,batch_size=batch_size,callbacks=[sample_z])
 
     labels_test = to_categorical(y_test, 10)
     score = resnet.evaluate(X_test, labels_test, batch_size=batch_size)
+
+    print(score)
     
 
     
