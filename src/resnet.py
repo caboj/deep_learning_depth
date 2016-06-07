@@ -1,4 +1,4 @@
-from keras.layers import merge, Convolution2D, Input, BatchNormalization, Flatten, Dense, Reshape, ZeroPadding2D
+from keras.layers import merge, Flatten, Convolution3D, Convolution2D, Input, BatchNormalization, Dense, Reshape, Activation, AveragePooling2D, AveragePooling3D
 from keras.models import Model
 from keras.callbacks import Callback
 from numpy.random import binomial
@@ -10,14 +10,22 @@ class ResNet(object):
         self.depth = depth
         self.pl = pl
         n = shape[1]*shape[2]
-        inputs = Input(shape=(n,))
+        inputs = Input(shape)
         self.z = np.arange(depth-1)#Input(shape=(depth-1,))
+        self.filters = 64
+        self.strides = 1
         
-        inputs_n = Dense(n,init='uniform',activation='relu')(self.__res_block__(shape,n,inputs,1))
-        for zi in self.z:
-            inputs_n = Dense(n,init='uniform',activation='relu')(self.__res_block__(shape,n,inputs_n,zi))
+        inputs_n = Activation('relu')(BatchNormalization(mode=1)(Convolution2D(64,7,7,border_mode='same')(inputs)))#(Reshape(shape)(inputs))))
+        for i in range(len(self.z)):
+            if np.mod(i+1,6) == 0:
+                self.strides = 2
+                self.filters = int(self.filters*2)
+            else:
+                self.strides=1
+            inputs_n = Activation('relu')(self.__res_block__(shape,n,inputs_n,self.z[i]))
 
-        out = Dense(10,init='uniform',activation='relu')(inputs_n)#self.__res_block__(shape,n,inputs_n))
+        out = AveragePooling2D(pool_size=(1,1))(inputs_n)
+        out = Dense(10,activation='softmax')(Flatten()(out))
         self.resnet = Model(input=inputs,output=out)
 
     def __res_block__(self,shape,n,inputs,zi):
@@ -25,19 +33,14 @@ class ResNet(object):
         if zi == 0:
             return inputs 
     
-        x = Reshape(shape,input_shape=(n,))(inputs)
-        x = ZeroPadding2D(padding=(1,1))(x)
-        x = Convolution2D(1,3,3,init='uniform',border_mode='valid')(x)
+        x = Convolution2D(self.filters,3,3,border_mode='same',subsample=(self.strides,self.strides))(inputs)
         x = BatchNormalization(mode=1)(x)
-        x = Flatten()(x)
-        x = Dense(n,init='uniform',activation='relu')(x)
-        x = Reshape(shape)(x)
-        x = ZeroPadding2D(padding=(1,1))(x)
-        x = Convolution2D(1,3,3,init='uniform',border_mode='valid')(x)
+        x = Activation('relu')(x)
+        x = Convolution2D(self.filters,3,3,border_mode='same')(x)
         x = BatchNormalization(mode=1)(x)
-        x = Flatten()(x)
-
-        block_out = merge([inputs,x],mode='sum')
+        
+        i = Convolution2D(self.filters,1,1,border_mode='same',subsample=(self.strides,self.strides))(inputs)
+        block_out = merge([i,x],mode='sum')
 
         return block_out
         
