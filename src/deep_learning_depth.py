@@ -29,8 +29,10 @@ def main():
                         help='number of reblocks to use')
     parser.add_argument('-p', metavar="survival_p", dest="survival_p", type=float, 
                         help='set this to use stochastic resnet')
+    parser.add_argument('-f', metavar="filter_increase", dest="filt_inc", nargs='+', 
+                        help='specify at which resblocks the filters should double')
 
-    parser.set_defaults(epochs=100,samples=0,batch_size=1,depth=10,survival_p=0)
+    parser.set_defaults(epochs=100,samples=0,batch_size=20,depth=17,survival_p=.5,filt_inc=[3,7,13])
     args = parser.parse_args()
     
     epochs=args.epochs
@@ -39,6 +41,8 @@ def main():
     depth=args.depth
     samples_test = len(test_data[1]) if args.samples == 0 else args.samples
     pl=args.survival_p
+    filt_inc = args.filt_inc
+    print(filt_inc)
 
     X_train = np.array(X_train[:samples])
     y_train = np.array(y_train[:samples])
@@ -49,9 +53,9 @@ def main():
     #datagen.fit(X_train)
     #datagen.fit(X_test)
     
-    net = ResNet((3,32,32),depth,pl)
+    net = ResNet((3,32,32),depth,pl,filt_inc)
     resnet = net.get_net()
-    sgd =SGD(lr=0.0001, decay=1e-6,momentum=0.9)
+    sgd =SGD(lr=0.01, decay=1e-6,momentum=0.9)
     resnet.compile(optimizer=sgd,
               loss='categorical_crossentropy',
               metrics=['accuracy'])
@@ -60,9 +64,9 @@ def main():
     sample_z = SurvivalProb(depth,pl)
             
     resnet.fit(X_train,labels,batch_size=batch_size,nb_epoch=epochs,callbacks=[sample_z])
-#    resnet.fit_generator(datagen.flow(X_train,labels,batch_size=batch_size),samples_per_epoch=len(X_train),callbacks=[sample_z])
-
+    #    resnet.fit_generator(datagen.flow(X_train,labels,batch_size=batch_size),samples_per_epoch=len(X_train),callbacks=[sample_z])
     labels_test = to_categorical(y_test, 10)
+    resnet.z = np.ones(depth)
     score = resnet.evaluate(X_test, labels_test, batch_size=batch_size)
 
     print(score)

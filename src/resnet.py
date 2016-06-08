@@ -5,26 +5,31 @@ from numpy.random import binomial
 import numpy as np
 
 class ResNet(object):
-    def __init__(self,shape,depth,pl):
+    def __init__(self,shape,depth,pl,filt_inc):
 
         self.depth = depth
         self.pl = pl
         n = shape[1]*shape[2]
         inputs = Input(shape)
         self.z = np.arange(depth-1)#Input(shape=(depth-1,))
+        self.filter_increase = filt_inc
         self.filters = 64
         self.strides = 1
         
         inputs_n = Activation('relu')(BatchNormalization(mode=1)(Convolution2D(64,7,7,border_mode='same')(inputs)))#(Reshape(shape)(inputs))))
+        dim_decrease = 1
         for i in range(len(self.z)):
-            if np.mod(i+1,6) == 0:
+            if i in self.filter_increase:
+                dim_decrease += 1
                 self.strides = 2
                 self.filters = int(self.filters*2)
             else:
                 self.strides=1
             inputs_n = Activation('relu')(self.__res_block__(shape,n,inputs_n,self.z[i]))
 
-        out = AveragePooling2D(pool_size=(1,1))(inputs_n)
+
+        int(shape[2]/2**dim_decrease)
+        out = AveragePooling2D(pool_size=(int(shape[1]/2**dim_decrease),int(shape[2]/2**dim_decrease)))(inputs_n)
         out = Dense(10,activation='softmax')(Flatten()(out))
         self.resnet = Model(input=inputs,output=out)
 
@@ -59,5 +64,8 @@ class SurvivalProb(Callback):
         self.__resample_z()
 
     def __resample_z(self):
-        self.model.z = np.array([binomial(1,1-(d/self.depth)*(1-self.pl)) for d in range(1,self.depth)])
+        if self.pl == 1:
+            self.model.z = np.ones(depth)
+        else:
+            self.model.z = np.array([binomial(1,1-(d/self.depth)*(1-self.pl)) for d in range(1,self.depth)])
     
