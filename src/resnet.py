@@ -21,11 +21,11 @@ class ResNet(object):
         self.strides = 1
         old_shape = shape
                 
-        net = Sequential([Convolution2D(64,7,7,border_mode='same',input_shape=shape),
-                          BatchNormalization(mode=0,axis=1),
-                          Activation('relu')])
+        #net = Sequential([Convolution2D(64,7,7,border_mode='same',input_shape=shape),
+        #                  BatchNormalization(mode=0,axis=1),
+        #                  Activation('relu')])
                                         
-        #inputs_n = Activation('relu')(BatchNormalization(mode=0,axis=1)(Convolution2D(64,7,7,border_mode='same')(inputs)))
+        inputs_n = Activation('relu')(BatchNormalization(mode=0,axis=1)(Convolution2D(64,7,7,border_mode='same')(inputs)))
 
         for i in range(depth-1):
             if i in self.filter_increase:
@@ -35,17 +35,24 @@ class ResNet(object):
             else:
                 old_shape = shape
                 self.strides=1
-            net.add(self.__res_block__(shape,old_shape,inputs,self.z[i]))
-            #inputs_n = self.__res_block__(shape,old_shape,inputs_n,self.z[i])(inputs_n)
-                        
-        net.add(AveragePooling2D(pool_size=(shape[1],shape[2])))
-        net.add(Flatten())
-        net.add(Dense(10,activation='softmax'))
+            #net.add(self.__res_block__(shape,old_shape,inputs,self.z[i]))
+            #inputs_n = self.__res_block__(shape,old_shape,inputs_n,self.z[i])
+            conv = Convolution2D(self.filters,1,1,border_mode='same',subsample=(self.strides,self.strides))
+            conv.build(shape)
+
+            # --- comment l.46  and uncomment l.47 to see error introduced by K.switch
+            inputs_n = K.switch(T.eq(1,self.z[i]),
+                                conv.call(inputs_n),
+                                conv.call(inputs_n))
+                                #Convolution2D(self.filters,1,1,border_mode='same',subsample=(self.strides,self.strides))(inputs_n))
+        #net.add(AveragePooling2D(pool_size=(shape[1],shape[2])))
+        #net.add(Flatten())
+        #net.add(Dense(10,activation='softmax'))
         #out = AveragePooling2D(pool_size=(shape[1],shape[2]))(inputs_n)
         #out = Dense(10,activation='softmax')(Flatten()(out))
 
-        self.resnet = net
-        #self.resnet = Model(input=inputs,output=out)
+        #self.resnet = net
+        self.resnet = Model(input=inputs,output=inputs_n)
 
     def __res_block__(self,shape,old_shape,inputs,zi):
 
@@ -64,20 +71,18 @@ class ResNet(object):
         block_out = Sequential([ block,Activation('relu')])
             
         '''
-        x = Convolution2D(self.filters,3,3,border_mode='same',subsample=(self.strides,self.strides))(inputs)
-        x = BatchNormalization(mode=0,axis=1)(x)
+        i = Convolution2D(self.filters,3,3,border_mode='same',subsample=(self.strides,self.strides))(inputs)
+        x = BatchNormalization(mode=0,axis=1)(i)
         x = Activation('relu')(x)
         x = Convolution2D(self.filters,3,3,border_mode='same')(x)
         x = BatchNormalization(mode=0,axis=1)(x)
         
-        i = Convolution2D(self.filters,1,1,border_mode='same',subsample=(self.strides,self.strides))(inputs)
-
         block = merge([i,x],mode='sum')
         block = Activation('relu')(block)
 
-        res_block = Model(input=inputs,output=block)
+        #res_block = Model(input=inputs,output=block)
         
-        return res_block #block_out
+        return block
         
     def get_net(self):
         return self.resnet
