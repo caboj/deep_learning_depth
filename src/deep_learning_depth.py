@@ -1,6 +1,7 @@
 import argparse
 from mnist import MNIST
 import numpy as np
+#from resnet_func import *
 from resnet import *
 from keras.utils.np_utils import to_categorical
 from keras.optimizers import SGD
@@ -42,7 +43,6 @@ def main():
     samples_test = len(test_data[1]) if args.samples == 0 else args.samples
     pl=args.survival_p
     filt_inc = args.filt_inc
-    print(filt_inc)
 
     X_train = np.array(X_train[:samples])
     y_train = np.array(y_train[:samples])
@@ -55,6 +55,7 @@ def main():
     
     net = ResNet((3,32,32),depth,pl,filt_inc)
     resnet = net.get_net()
+    
     sgd =SGD(lr=0.01, decay=1e-6,momentum=0.9)
     resnet.compile(optimizer=sgd,
               loss='categorical_crossentropy',
@@ -62,7 +63,7 @@ def main():
 
     labels = to_categorical(y_train, 10)
     sample_z = SurvivalProb(depth,pl)
-            
+    
     resnet.fit(X_train,labels,batch_size=batch_size,nb_epoch=epochs,callbacks=[sample_z])
     #    resnet.fit_generator(datagen.flow(X_train,labels,batch_size=batch_size),samples_per_epoch=len(X_train),callbacks=[sample_z])
     labels_test = to_categorical(y_test, 10)
