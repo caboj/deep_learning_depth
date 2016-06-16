@@ -10,12 +10,11 @@ import theano
 from keras.engine.topology import Layer
 
 class ResNet(object):
-    def __init__(self,shape,depth,pl,filt_inc):
+    def __init__(self,shape,depth,initial_pl,filt_inc):
 
         self.depth = depth
         inputs = Input(shape)
-        self.pl = pl
-        self.z = np.array([binomial(1,1-(d/self.depth)*(1-self.pl)) for d in range(1,self.depth)])
+        self.z = np.array([binomial(1,initial_pl) for d in range(self.depth-1)])
         self.filter_increase = filt_inc
         self.filters = 64
         self.strides = 1
@@ -74,19 +73,38 @@ class Switch_Layer(Layer):
         return input_shape[0]
 
 class SurvivalProb(Callback):
-    def __init__(self, depth, pl):
+    def __init__(self, depth, pl, batch_size):
+        self.pl0 = pl[0]
+        self.c = 8
+        self.alpha = .9
         self.depth = depth
         self.pl = pl
+        self.batch_size = batch_size
+        
         
     def on_train_begin(self,logs={}):
         self.__resample_z()
 
     def on_batch_end(self,batch,logs={}):
+        self.__update_pl(logs.get('loss'))
         self.__resample_z()
 
     def __resample_z(self):
-        if self.pl == 1:
-            self.model.z = np.ones(depth)
-        else:
-            self.model.z = np.array([binomial(1,1-(d/self.depth)*(1-self.pl)) for d in range(1,self.depth)])
-    
+        self.model.z = np.array([binomial(1,pli) for pli in self.pl])
+        print(' resampled z ')
+        print(self.pl)
+        print(self.model.z)
+        
+    def __update_pl(self,loss):
+        cb = np.log(loss)/self.batch_size
+        c = self.alpha*self.c+(1-self.alpha)*cb
+        li = np.log(loss)/self.batch_size - c
+        
+        pli_deriv = lambda pli, zi: zi/pli+(1-zi)/(1-pli)
+        kl_deriv = lambda pli: np.log((1-self.pl0)/(1-pli))+pli*np.log(self.pl0/pli)
+        s = lambda x: 1/(1+np.exp(x))
+        pl = [s(self.pl[i]+li*(pli_deriv(self.pl[i],self.model.z[i])-kl_deriv(self.pl[i]))/self.depth) for i in range(len(self.pl))]
+        self.pl=np.array(pl)
+        
+        
+

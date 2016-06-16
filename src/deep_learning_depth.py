@@ -52,6 +52,9 @@ def main():
     #datagen = ImageDataGenerator(featurewise_center=True)
     #datagen.fit(X_train)
     #datagen.fit(X_test)
+
+    initial_pl = np.array([pl for i in range(depth-1)])
+    sample_z = SurvivalProb(depth,initial_pl,batch_size)
     
     net = ResNet((3,32,32),depth,pl,filt_inc)
     resnet = net.get_net()
@@ -61,8 +64,8 @@ def main():
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
+
     labels = to_categorical(y_train, 10)
-    sample_z = SurvivalProb(depth,pl)
     
     resnet.fit(X_train,labels,batch_size=batch_size,nb_epoch=epochs,callbacks=[sample_z])
     #    resnet.fit_generator(datagen.flow(X_train,labels,batch_size=batch_size),samples_per_epoch=len(X_train),callbacks=[sample_z])
