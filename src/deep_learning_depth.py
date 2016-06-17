@@ -56,7 +56,7 @@ def main():
     initial_pl = np.array([pl for i in range(depth-1)])
     sample_z = SurvivalProb(depth,initial_pl,batch_size)
     
-    net = ResNet((3,32,32),depth,pl,filt_inc)
+    net = ResNet((3,32,32),depth,filt_inc)
     resnet = net.get_net()
     
     sgd =SGD(lr=0.01, decay=1e-6,momentum=0.9)

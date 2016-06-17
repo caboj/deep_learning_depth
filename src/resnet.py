@@ -10,11 +10,11 @@ import theano
 from keras.engine.topology import Layer
 
 class ResNet(object):
-    def __init__(self,shape,depth,initial_pl,filt_inc):
+    def __init__(self,shape,depth,filt_inc):
 
         self.depth = depth
         inputs = Input(shape)
-        self.z = np.array([binomial(1,initial_pl) for d in range(self.depth-1)])
+        self.z = Input((depth-1,))
         self.filter_increase = filt_inc
         self.filters = 64
         self.strides = 1
@@ -33,8 +33,7 @@ class ResNet(object):
 
             prev_in = Convolution2D(self.filters,1,1,border_mode='same',subsample=(self.strides,self.strides))(inputs_n)
             inputs_n = self.__res_block__(inputs_n)
-            inputs_n = Switch_Layer(self.z[i])([inputs_n,prev_in])
-
+            inputs_n =Switch_Layer(self.z[i])([inputs_n,prev_in])
         out = AveragePooling2D(pool_size=(shape[1],shape[2]))(inputs_n)
         out = Dense(10,activation='softmax')(Flatten()(out))
 
@@ -57,20 +56,21 @@ class ResNet(object):
         return self.resnet
 
 class Switch_Layer(Layer):
-    def __init__(self, zi, **kwargs):
+    def __init__(self, zi,**kwargs):
         self.zi = zi
         super(Switch_Layer, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        self.trainable_weights = []
+        self.zi = np.random.randint(2)
+        self.non_trainable_weights = []
 
     def call(self, vals, mask=None):
-        x=vals[0]
+        x = vals[0]
         x0 = vals[1]
-        return ifelse(K.equal(0,self.zi),x0,x)
+        return ifelse(self.zi,x0,x)
         
     def get_output_shape_for(self, input_shape):
-        return input_shape[0]
+        return input_shape[1]
 
 class SurvivalProb(Callback):
     def __init__(self, depth, pl, batch_size):
@@ -96,11 +96,12 @@ class SurvivalProb(Callback):
         print(self.model.z)
         
     def __update_pl(self,loss):
-        cb = np.log(loss)/self.batch_size
-        c = self.alpha*self.c+(1-self.alpha)*cb
-        li = np.log(loss)/self.batch_size - c
+        cb = np.log(loss)
+        self.c = self.alpha*self.c+(1-self.alpha)*cb
+        li = np.log(loss) - self.c
         
-        pli_deriv = lambda pli, zi: zi/pli+(1-zi)/(1-pli)
+        pli_deriv = lambda pli, zi: zi/pli-(1-zi)/(1-pli)
+        #deriv of sigmoid
         kl_deriv = lambda pli: np.log((1-self.pl0)/(1-pli))+pli*np.log(self.pl0/pli)
         s = lambda x: 1/(1+np.exp(x))
         pl = [s(self.pl[i]+li*(pli_deriv(self.pl[i],self.model.z[i])-kl_deriv(self.pl[i]))/self.depth) for i in range(len(self.pl))]
