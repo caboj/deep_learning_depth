@@ -18,6 +18,8 @@ class ResNet(object):
         self.filter_increase = filt_inc
         self.filters = 64
         self.strides = 1
+        self.test = 0
+        
                                                 
         inputs_n = Activation('relu')(
             BatchNormalization(mode=0,axis=1)(
@@ -33,7 +35,7 @@ class ResNet(object):
 
             prev_in = Convolution2D(self.filters,1,1,border_mode='same',subsample=(self.strides,self.strides))(inputs_n)
             inputs_n = self.__res_block__(inputs_n)
-            inputs_n =Switch_Layer(self.z[i])([inputs_n,prev_in])
+            inputs_n =Switch_Layer(self.z[i],self.test)([inputs_n,prev_in])
         out = AveragePooling2D(pool_size=(shape[1],shape[2]))(inputs_n)
         out = Dense(10,activation='softmax')(Flatten()(out))
 
@@ -56,8 +58,9 @@ class ResNet(object):
         return self.resnet
 
 class Switch_Layer(Layer):
-    def __init__(self, zi,**kwargs):
+    def __init__(self, zi,test,**kwargs):
         self.zi = zi
+        self.test = test
         super(Switch_Layer, self).__init__(**kwargs)
 
     def build(self, input_shape):
@@ -65,9 +68,12 @@ class Switch_Layer(Layer):
         self.non_trainable_weights = []
 
     def call(self, vals, mask=None):
-        x = vals[0]
-        x0 = vals[1]
-        return ifelse(self.zi,x0,x)
+        
+        block_out = vals[0]
+        prev_out = vals[1]
+        test_out = self.zi * block_out
+        
+        return ifelse(self.test, test_out, ifelse(self.zi,block_out,prev_out))
         
     def get_output_shape_for(self, input_shape):
         return input_shape[1]
@@ -80,21 +86,22 @@ class SurvivalProb(Callback):
         self.depth = depth
         self.pl = pl
         self.batch_size = batch_size
-        
+        self.Z_history = []
         
     def on_train_begin(self,logs={}):
         self.__resample_z()
 
     def on_batch_end(self,batch,logs={}):
-        self.__update_pl(logs.get('loss'))
+        #self.__update_pl(logs.get('loss'))
         self.__resample_z()
 
     def __resample_z(self):
         self.model.z = np.array([binomial(1,pli) for pli in self.pl])
-        print(' resampled z ')
-        print(self.pl)
-        print(self.model.z)
-        
+        self.Z_history.append(self.model.z)
+        #print(' resampled z ')
+        #print(self.pl)
+        #print(self.model.z)
+
     def __update_pl(self,loss):
         cb = np.log(loss)
         self.c = self.alpha*self.c+(1-self.alpha)*cb
@@ -109,3 +116,11 @@ class SurvivalProb(Callback):
         
         
 
+class LossAccuracyHistory(Callback):
+    def on_train_begin(self, logs={}):
+        self.losses = []
+        self.accuracy = []
+
+    def on_batch_end(self, batch, logs={}):
+        self.losses.append(logs.get('loss'))
+        self.accuracy.append(logs.get('acc'))

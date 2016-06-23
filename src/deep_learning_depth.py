@@ -1,3 +1,4 @@
+import pickle
 import argparse
 from mnist import MNIST
 import numpy as np
@@ -53,7 +54,10 @@ def main():
     #datagen.fit(X_train)
     #datagen.fit(X_test)
 
-    initial_pl = np.array([pl for i in range(depth-1)])
+    #initial_pl = np.array([pl for i in range(depth-1)])
+    initial_pl = np.array([1-(i/depth)*(1-pl) for i in range(1,depth)])
+
+    hist = LossAccuracyHistory()
     sample_z = SurvivalProb(depth,initial_pl,batch_size)
     
     net = ResNet((3,32,32),depth,filt_inc)
@@ -67,15 +71,23 @@ def main():
 
     labels = to_categorical(y_train, 10)
     
-    resnet.fit(X_train,labels,batch_size=batch_size,nb_epoch=epochs,callbacks=[sample_z])
+    resnet.fit(X_train,labels,batch_size=batch_size,nb_epoch=epochs,callbacks=[sample_z,hist])
     #    resnet.fit_generator(datagen.flow(X_train,labels,batch_size=batch_size),samples_per_epoch=len(X_train),callbacks=[sample_z])
     labels_test = to_categorical(y_test, 10)
-    resnet.z = np.ones(depth)
+    resnet.test = 1
+    resnet.z = initial_pl
+    
     score = resnet.evaluate(X_test, labels_test, batch_size=batch_size)
 
-    print(score)
+    results = {}
+    results[str(resnet.metrics_names)] = score
+    results['losses'] = hist.losses
+    results['accuracy']=hist.accuracy
+    results['Z_hist']=sample_z.Z_history
+    with open('results/res0', 'wb') as f:
+        pickle.dump(results,f)
+        
     
-
     
 if __name__ == "__main__":
     main()
