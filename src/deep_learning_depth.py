@@ -1,6 +1,6 @@
 import pickle
 import argparse
-from mnist import MNIST
+#from mnist import MNIST
 import numpy as np
 #from resnet_func import *
 from resnet import *
@@ -38,10 +38,10 @@ def main():
     args = parser.parse_args()
     
     epochs=args.epochs
-    samples = len(train_data[1]) if args.samples == 0 else args.samples
+    samples = len(X_train) if args.samples == 0 else args.samples
     batch_size=args.batch_size
     depth=args.depth
-    samples_test = len(test_data[1]) if args.samples == 0 else args.samples
+    samples_test = len(X_test) if args.samples == 0 else args.samples
     pl=args.survival_p
     filt_inc = args.filt_inc
 
