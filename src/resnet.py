@@ -1,4 +1,4 @@
-from keras.layers import merge, Merge, Flatten, Convolution3D, Convolution2D, Input, BatchNormalization, Dense, Reshape, Activation, AveragePooling2D, AveragePooling3D
+from keras.layers import merge, Merge, Flatten, Convolution2D, Input, BatchNormalization, Dense, Reshape, Activation, AveragePooling2D, AveragePooling3D
 from keras.models import Model, Sequential
 from keras.callbacks import Callback
 from keras import backend as K

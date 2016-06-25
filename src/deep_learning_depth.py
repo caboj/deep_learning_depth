@@ -2,7 +2,6 @@ import pickle
 import argparse
 #from mnist import MNIST
 import numpy as np
-#from resnet_func import *
 from resnet import *
 from keras.utils.np_utils import to_categorical
 from keras.optimizers import SGD
@@ -13,10 +12,15 @@ from keras.datasets import cifar10
 def main():
 
     # load data
-    #mndata = MNIST('../data')
-    #train_data=mndata.load_training()
-    #test_data=mndata.load_testing()
-
+    '''
+    mndata = MNIST('../data')
+    train_data=mndata.load_training()
+    test_data=mndata.load_testing()
+    X_train=train_data[0]
+    y_train=train_data[1]
+    X_test=test_data[0]
+    y_test=test_data[1]
+    '''
     (X_train, y_train), (X_test, y_test) = cifar10.load_data()
     
     # parse aguments
@@ -61,9 +65,10 @@ def main():
     sample_z = SurvivalProb(depth,initial_pl,batch_size)
     
     net = ResNet((3,32,32),depth,filt_inc)
+    #net = ResNet((784,),depth,filt_inc)
     resnet = net.get_net()
     
-    sgd =SGD(lr=0.01, decay=1e-6,momentum=0.9)
+    sgd =SGD(lr=0.01, decay=1e-4,momentum=0.9)
     resnet.compile(optimizer=sgd,
               loss='categorical_crossentropy',
               metrics=['accuracy'])
