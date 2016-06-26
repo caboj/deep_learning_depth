@@ -122,5 +122,5 @@ class LossAccuracyHistory(Callback):
         self.accuracy = []
 
     def on_batch_end(self, batch, logs={}):
-        self.losses.append(logs.get('loss'))
-        self.accuracy.append(logs.get('acc'))
+        self.losses.append(logs.get('val_loss'))
+        self.accuracy.append(logs.get('val_acc'))

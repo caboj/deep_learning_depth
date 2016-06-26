@@ -7,6 +7,7 @@ from keras.utils.np_utils import to_categorical
 from keras.optimizers import SGD
 from keras.preprocessing.image import ImageDataGenerator
 from keras.datasets import cifar10
+from keras.callbacks import EarlyStopping, LearningRateScheduler
 
 
 def main():
@@ -38,7 +39,7 @@ def main():
     parser.add_argument('-f', metavar="filter_increase", dest="filt_inc", nargs='+', 
                         help='specify at which resblocks the filters should double')
 
-    parser.set_defaults(epochs=100,samples=0,batch_size=20,depth=17,survival_p=.5,filt_inc=[3,7,13])
+    parser.set_defaults(epochs=60,samples=0,batch_size=120,depth=17,survival_p=.5,filt_inc=[3,7,13])
     args = parser.parse_args()
     
     epochs=args.epochs
@@ -57,15 +58,17 @@ def main():
     #datagen = ImageDataGenerator(featurewise_center=True)
     #datagen.fit(X_train)
     #datagen.fit(X_test)
-
+    
     #initial_pl = np.array([pl for i in range(depth-1)])
     initial_pl = np.array([1-(i/depth)*(1-pl) for i in range(1,depth)])
 
     hist = LossAccuracyHistory()
     sample_z = SurvivalProb(depth,initial_pl,batch_size)
-    
+    early_stop = EarlyStopping(monitor='val_loss', patience=3, verbose=0, mode='auto')    
+    schedule = lambda epoch: float(0.01*0.5**np.floor(epoch/15))
+    decrease_lr = LearningRateScheduler(schedule)
+
     net = ResNet((3,32,32),depth,filt_inc)
-    #net = ResNet((784,),depth,filt_inc)
     resnet = net.get_net()
     
     sgd =SGD(lr=0.01, decay=1e-4,momentum=0.9)
@@ -76,7 +79,7 @@ def main():
 
     labels = to_categorical(y_train, 10)
     
-    resnet.fit(X_train,labels,batch_size=batch_size,nb_epoch=epochs,callbacks=[sample_z,hist])
+    resnet.fit(X_train,labels,batch_size=batch_size,nb_epoch=epochs,validation_split=0.1,callbacks=[sample_z,hist,early_stop,decrease_lr])
     #    resnet.fit_generator(datagen.flow(X_train,labels,batch_size=batch_size),samples_per_epoch=len(X_train),callbacks=[sample_z])
     labels_test = to_categorical(y_test, 10)
     resnet.test = 1
