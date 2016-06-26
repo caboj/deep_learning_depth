@@ -85,14 +85,24 @@ class SurvivalProb(Callback):
         self.alpha = .9
         self.depth = depth
         self.pl = pl
+        self.phi = [-np.log(1/pli-1) for pli in pl]
+        self.delta_phi = np.zeros(len(pl))
         self.batch_size = batch_size
         self.Z_history = []
-        
+        #self.losses = []
+
     def on_train_begin(self,logs={}):
         self.__resample_z()
 
+    def on_epoch_end(self,epoch,logs={}):
+        py = np.log(logs.get('acc'))
+        ex_deriv = lambda z_l, phi_l: z_l-(1/(np.e**-phi_l+1))
+        self.delta_phi = [self.delta_phi[i]+py*ex_deriv(self.model.z[i],self.phi[i]) for i in range(len(self.pl))]
+        self.__resample_z()
+        #self.losses.append(logs.get('loss'))
+        
     def on_batch_end(self,batch,logs={}):
-        #self.__update_pl(logs.get('loss'))
+        self.__update_pl(logs.get('loss'))
         self.__resample_z()
 
     def __resample_z(self):
@@ -106,12 +116,12 @@ class SurvivalProb(Callback):
         cb = np.log(loss)
         self.c = self.alpha*self.c+(1-self.alpha)*cb
         li = np.log(loss) - self.c
-        
-        pli_deriv = lambda pli, zi: zi/pli-(1-zi)/(1-pli)
-        #deriv of sigmoid
-        kl_deriv = lambda pli: np.log((1-self.pl0)/(1-pli))+pli*np.log(self.pl0/pli)
+        kl_const = lambda phi_l: np.e**phi_l/(np.e**phi_l+1)**2
+        kl_deriv = lambda phi_l: kl_const(phi_l)*(np.log(self.pl0*(np.e**-phi_l+1))-np.log((1-self.pl0)*np.e**-phi_l+1))
         s = lambda x: 1/(1+np.exp(x))
-        pl = [s(self.pl[i]+li*(pli_deriv(self.pl[i],self.model.z[i])-kl_deriv(self.pl[i]))/self.depth) for i in range(len(self.pl))]
+        self.phi = [self.phi[i] + li*self.delta_phi[i]/self.batch_size+kl_deriv(self.phi[i]) for i in range(len(self.phi))]
+        self.delta_phi=np.zeros(len(self.pl))
+        pl = [s(self.phi[i]) for i in range(len(self.pl))]
         self.pl=np.array(pl)
         
         

@@ -64,7 +64,7 @@ def main():
 
     hist = LossAccuracyHistory()
     sample_z = SurvivalProb(depth,initial_pl,batch_size)
-    early_stop = EarlyStopping(monitor='val_loss', patience=3, verbose=0, mode='auto')    
+    early_stop = EarlyStopping(monitor='val_loss', patience=8, verbose=0, mode='auto')    
     schedule = lambda epoch: float(0.01*0.5**np.floor(epoch/15))
     decrease_lr = LearningRateScheduler(schedule)
 
@@ -79,7 +79,7 @@ def main():
 
     labels = to_categorical(y_train, 10)
     
-    resnet.fit(X_train,labels,batch_size=batch_size,nb_epoch=epochs,validation_split=0.1,callbacks=[sample_z,hist,early_stop,decrease_lr])
+    resnet.fit(X_train,labels,batch_size=batch_size,nb_epoch=epochs,validation_split=0.1,callbacks=[sample_z,hist,decrease_lr])
     #    resnet.fit_generator(datagen.flow(X_train,labels,batch_size=batch_size),samples_per_epoch=len(X_train),callbacks=[sample_z])
     labels_test = to_categorical(y_test, 10)
     resnet.test = 1
@@ -92,7 +92,7 @@ def main():
     results['losses'] = hist.losses
     results['accuracy']=hist.accuracy
     results['Z_hist']=sample_z.Z_history
-    with open('results/res0', 'wb') as f:
+    with open('results/res0_updates', 'wb') as f:
         pickle.dump(results,f)
         
     
